@@ -1432,25 +1432,13 @@ async def handle_sequential_click_for_dropdown(
         step=step,
     )
 
-    options = CustomSelectPromptOptions(
-        field_information=dropdown_select_context.intention
-        if dropdown_select_context.intention
-        else dropdown_select_context.field,
-        is_date_related=dropdown_select_context.is_date_related,
-        required_field=dropdown_select_context.is_required,
-    )
-
     if dropdown_select_context.is_date_related:
-        return await _select_date_from_emerging_elements_or_skip(
-            current_element_id=anchor_element.get_id(),
-            options=options,
-            page=page,
-            scraped_page=scraped_page,
-            step=step,
-            task=task,
-            scraped_page_after_open=scraped_page_after_open,
-            new_interactable_element_ids=new_interactable_element_ids,
+        LOG.info(
+            "The dropdown is date related, exiting the sequential click logic and skipping the remaining actions",
         )
+        result = ActionSuccess()
+        result.skip_remaining_actions = True
+        return result
 
     LOG.info(
         "Found the dropdown menu element after clicking, triggering the sequential click logic",
@@ -1459,7 +1447,13 @@ async def handle_sequential_click_for_dropdown(
 
     return await select_from_emerging_elements(
         current_element_id=anchor_element.get_id(),
-        options=options,
+        options=CustomSelectPromptOptions(
+            field_information=dropdown_select_context.intention
+            if dropdown_select_context.intention
+            else dropdown_select_context.field,
+            is_date_related=dropdown_select_context.is_date_related,
+            required_field=dropdown_select_context.is_required,
+        ),
         page=page,
         scraped_page=scraped_page,
         step=step,
@@ -4181,49 +4175,6 @@ class CustomSelectPromptOptions(BaseModel):
     required_field: bool = False
     field_information: str = ""
     target_value: str | None = None
-
-
-async def _select_date_from_emerging_elements_or_skip(
-    current_element_id: str,
-    options: CustomSelectPromptOptions,
-    page: Page,
-    scraped_page: ScrapedPage,
-    step: Step,
-    task: Task,
-    scraped_page_after_open: ScrapedPage,
-    new_interactable_element_ids: list[str],
-) -> ActionResult:
-    try:
-        result = await select_from_emerging_elements(
-            current_element_id=current_element_id,
-            options=options,
-            page=page,
-            scraped_page=scraped_page,
-            step=step,
-            task=task,
-            scraped_page_after_open=scraped_page_after_open,
-            new_interactable_element_ids=new_interactable_element_ids,
-        )
-    except Exception:
-        LOG.warning(
-            "Date-related emerging element selection failed, preserving skip behavior",
-            current_element_id=current_element_id,
-            exc_info=True,
-        )
-        result = ActionSuccess()
-
-    if not result.success:
-        LOG.warning(
-            "Date-related emerging element selection returned failure, preserving skip behavior",
-            current_element_id=current_element_id,
-            selection_exception_type=result.exception_type,
-            selection_exception_message=result.exception_message,
-            selection_data=result.data,
-        )
-        result = ActionSuccess()
-
-    result.skip_remaining_actions = True
-    return result
 
 
 def _extract_new_subtrees(elements: list[dict], new_ids: set[str]) -> list[dict]:
